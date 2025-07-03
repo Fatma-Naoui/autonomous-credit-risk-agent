@@ -1,0 +1,18 @@
+agent_name: autonomous_risk_agent
+run_location: local
+
+tasks:
+  - name: code_generation
+    active: true
+  - name: debugging
+    active: true
+  - name: pipeline_run
+    active: true
+  - name: dashboard
+    active: true
+
+llm_reporting:
+  active: false
+
+rag:
+  active: false

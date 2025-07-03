@@ -1,0 +1,21 @@
+# Ignore Python virtual environment
+venv/
+.env
+
+# Ignore __pycache__ folders
+__pycache__/
+
+# Ignore Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Ignore other system files
+.DS_Store
+Thumbs.db
+
+# Ignore AutoGluon model outputs (optional, depends if you want to track them)
+AutogluonModels/
+agent_core/models/
+
+# Ignore logs and temporary files
+*.log
+*.tmp
