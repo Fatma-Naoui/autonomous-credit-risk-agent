@@ -3,29 +3,36 @@ import os
 from llm_client import generate_code
 
 prompt = """
+
 You are a senior data scientist. Generate clean, runnable Python code for a binary classification credit risk project using AutoGluon.
 
 Requirements:
 
 - Use `from autogluon.tabular import TabularPredictor`.
-- Load training data from `agent_core/data/train_data.csv` and test data from `agent_core/data/test_data.csv` using these exact relative paths with `pd.read_csv()`.
+- **Create a function:**
+  ```
+  def run_pipeline(train_path, test_path, output_path):
+  ```
+  which:
+  - Loads training data from `train_path` and test data from `test_path` using `pd.read_csv()`.
+  - Uses `output_path` for saving all models, leaderboards, metrics, and plots.
 - Train the model using only default AutoGluon hyperparameters. Do not include any `hyperparameters` argument in the code.
-- Save the trained model in `agent_core/models`.
+- Save the trained model in `output_path/AutogluonModels`.
 - Generate:
-  - A leaderboard CSV as `agent_core/models/model_leaderboard.csv` and a copy as `agent_core/leaderboard.csv`.
-  - An evaluation metrics JSON as `agent_core/models/model_metrics.json` and a copy as `agent_core/evaluation_metrics.json`.
-  - A feature importance plot as `agent_core/models/shap_summary.png`.
+  - A leaderboard CSV as `output_path/model_leaderboard.csv` and a copy as `output_path/leaderboard.csv`.
+  - An evaluation metrics JSON as `output_path/model_metrics.json` and a copy as `output_path/evaluation_metrics.json`.
+  - A feature importance plot as `output_path/shap_summary.png`.
 - Use pandas for CSV operations and matplotlib for all plots.
 - Do not use or import the `shap` library.
 - Do not include any explanations or comments, only runnable Python code.
-- Ensure `agent_core/models` exists before saving outputs.
+- Ensure `output_path` exists before saving outputs.
 - Import scikit-learn as `import sklearn` (not `scikit-learn`).
 - After training, extract the top 3 models from the leaderboard.
 - For each of the top 3 models:
   - Generate and save:
-    - ROC curve as `agent_core/models/roc_{model_name}.png`
-    - Precision-Recall curve as `agent_core/models/pr_{model_name}.png`
-    - Confusion Matrix as `agent_core/models/confusion_matrix_{model_name}.png`
+    - ROC curve as `output_path/roc_{model_name}.png`
+    - Precision-Recall curve as `output_path/pr_{model_name}.png`
+    - Confusion Matrix as `output_path/confusion_matrix_{model_name}.png`
   - Use `sklearn.metrics` for ROC, AUC, Precision-Recall, and Confusion Matrix calculations.
   - Use consistent colors for each model across all plots so that if model A uses red in the ROC curve, it also uses red in the PR and Confusion Matrix plots.
   - Save all plots with `dpi=300` and `bbox_inches="tight"`.
@@ -41,12 +48,13 @@ Requirements:
   - `plot_roc_curve`
   - `plot_precision_recall_curve`
   - `plot_confusion_matrix`
-  - `main`
+  - `run_pipeline`
 - Use the correct Pandas indexing (`iloc` or column name) to extract positive class probabilities for `roc_auc_score`.
 - Ensure it works even if labels are categorical by dynamically selecting the positive class column.
 - Return only the raw, clean, runnable Python code without markdown fences under any circumstance.
 
 Your output will be used directly in a production MCP autonomous pipeline for credit risk modeling, so it must be robust, modular, and aligned strictly with these requirements.
+
 """
 
 code = generate_code(prompt)

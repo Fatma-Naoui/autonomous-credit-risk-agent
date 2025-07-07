@@ -4,7 +4,7 @@ import traceback
 from llm_client import generate_code
 
 MAX_RETRIES = 2
-CODE_FILE = "generated_pipeline.py"
+CODE_FILE = os.path.join(os.path.dirname(__file__), "generated_pipeline.py")
 FAST_DEBUG = True  # Toggle debug mode for faster iterations
 
 def run_generated_code():
