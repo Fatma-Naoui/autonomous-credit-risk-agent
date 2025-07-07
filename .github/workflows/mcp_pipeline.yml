@@ -27,11 +27,13 @@ jobs:
 
       - name: Generate pipeline
         run: |
-          python agent_core/llm_code_generator.py
+           python agent_core/agent/llm_code_generator.py
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
 
       - name: Debug pipeline
         run: |
-          python agent_core/debugger_agent.py
+          python agent_core/agent/debugger_agent.py
 
       - name: Commit and push if successful
         run: |
