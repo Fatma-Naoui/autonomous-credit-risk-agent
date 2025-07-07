@@ -29,7 +29,7 @@ jobs:
         run: |
            python agent_core/agent/llm_code_generator.py
         env:
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.LLM_API_KEY }}
 
       - name: Debug pipeline
         run: |
