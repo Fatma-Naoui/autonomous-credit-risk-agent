@@ -1,106 +1,105 @@
+import asyncio
 import subprocess
+import sys
 import time
-import traceback
+import json
+from pathlib import Path
 from llm_client import generate_code
+from agent_core.prompts.prompts import autogluon_pipeline_debugger_prompt
 
-MAX_RETRIES = 2
-CODE_FILE = os.path.join(os.path.dirname(__file__), "generated_pipeline.py")
-FAST_DEBUG = True  # Toggle debug mode for faster iterations
+class DebuggerAgent:
+    def __init__(self):
+        self.MAX_RETRIES = 3  # Reduced to limit runtime
+        self.CODE_FILE = Path(__file__).resolve().parent / "generated_pipeline.py"
+        self.PER_RUN_TIMEOUT = 100
 
-def run_generated_code():
-    """Run the generated pipeline and capture stdout and stderr."""
-    result = subprocess.run(
-        ["python", CODE_FILE],
-        capture_output=True,
-        text=True
-    )
-    return result.stdout, result.stderr, result.returncode
+    async def run_generated_code(self):
+        process = await asyncio.create_subprocess_exec(
+            "python", str(self.CODE_FILE),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=self.PER_RUN_TIMEOUT)
+            return stdout.decode(), stderr.decode(), process.returncode
+        except asyncio.TimeoutError:
+            process.kill()
+            return "", "Timeout during pipeline execution", 1
 
-def extract_relevant_code_snippet(code_text, lines=60):
-    """Extract the first and last parts of the code to reduce LLM load."""
-    code_lines = code_text.splitlines()
-    if len(code_lines) <= lines:
-        return code_text
-    return "\n".join(code_lines[:lines//2] + ["# ... (code truncated) ..."] + code_lines[-lines//2:])
+    def extract_relevant_code_snippet(self, code_text, lines=60):
+        code_lines = code_text.splitlines()
+        if len(code_lines) <= lines:
+            return code_text
+        return "\n".join(code_lines[:lines//2] + ["# ... (code truncated) ..."] + code_lines[-lines//2:])
 
-def extract_relevant_error_snippet(stderr_text, lines=30):
-    """Extract the last lines of stderr for relevant traceback."""
-    error_lines = stderr_text.strip().splitlines()
-    return "\n".join(error_lines[-lines:])
+    def extract_relevant_error_snippet(self, stderr_text, lines=30):
+        error_lines = stderr_text.strip().splitlines()
+        return "\n".join(error_lines[-lines:])
 
-def auto_debug():
-    retries = 0
+    def clean_generated_code(self, fixed_code):
+        fixed_code = fixed_code.strip()
+        if fixed_code.startswith("```"):
+            fixed_code = fixed_code.split("```", 1)[-1].strip()
+            if fixed_code.lower().startswith("python"):
+                fixed_code = fixed_code[len("python"):].lstrip("\n").lstrip()
+        if fixed_code.endswith("```"):
+            fixed_code = fixed_code.rsplit("```", 1)[0].strip()
+        return fixed_code
 
-    while retries < MAX_RETRIES:
-        print(f"\n⚡ Attempt {retries + 1} of {MAX_RETRIES}...\n")
-        stdout, stderr, returncode = run_generated_code()
+    async def auto_debug(self):
+        try:
+            retries = 0
+            total_start_time = time.time()
 
-        if returncode == 0:
-            print("✅ Code executed successfully.\n")
-            print(stdout)
-            break
-        else:
-            print("❌ Code execution failed. Capturing error and sending to LLM for fixing.\n")
-            print(stderr)
+            while retries < self.MAX_RETRIES:
+                print(f"[AutoDebug] Attempt {retries+1}/{self.MAX_RETRIES}")
+                stdout, stderr, returncode = await self.run_generated_code()
+                print(f"[AutoDebug] Return code: {returncode}")
+                print(f"[AutoDebug] Stdout:\n{stdout[:500]}")
+                print(f"[AutoDebug] Stderr:\n{stderr[:500]}")
 
-            code_content = open(CODE_FILE, 'r').read()
-            code_snippet = extract_relevant_code_snippet(code_content)
-            error_snippet = extract_relevant_error_snippet(stderr)
+                if returncode == 0 and stdout.strip():
+                    print("[AutoDebug] Pipeline executed successfully with output.")
+                    return {"status": "success", "message": "Pipeline executed successfully.", "stdout": stdout}
+                else:
+                    print("[AutoDebug] Pipeline failed or produced no output, calling LLM to regenerate.")
 
-            prompt = f"""
-You are a senior Python software engineer with deep expertise in AutoGluon for tabular data modeling, especially credit risk classification tasks.
+                    code_content = self.CODE_FILE.read_text(encoding="utf-8")
+                    code_snippet = self.extract_relevant_code_snippet(code_content)
+                    error_snippet = self.extract_relevant_error_snippet(stderr)
 
-The following Python code implements an AutoGluon pipeline for binary classification on credit risk data. It should load `agent_core/data/train_data.csv` and `agent_core/data/test_data.csv`, train a model using `loan_status` as the label, save the model, generate a leaderboard CSV, output evaluation metrics in JSON, and save a feature importance plot.
+                    prompt = autogluon_pipeline_debugger_prompt.format(
+                        code_snippet=code_snippet,
+                        error_snippet=error_snippet
+                    )
+                    print(f"[AutoDebug] Prompt to LLM:\n{prompt[:500]}")
 
-Your task is to fix the code so it runs without errors and aligns with the following corrections:
+                    fixed_code = await generate_code(prompt)  # Assume generate_code is async
+                    print(f"[AutoDebug] Raw LLM response:\n{fixed_code[:500]}")
 
-- Replace `metrics.to_dict()` with just `metrics` since `predictor.evaluate()` returns a dict.
-- Use robust absolute path handling:
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    data_path = os.path.join(project_root, 'data')
-    train_path = os.path.join(data_path, 'train_data.csv')
-    test_path = os.path.join(data_path, 'test_data.csv')
-    model_path = os.path.join(project_root, 'models')
-- Use AutoGluon `predictor.predict` and `predictor.predict_proba` directly on `test_data` for the top 3 models:
-    y_pred = predictor.predict(test_data, model=model_name)
-    y_pred_proba_df = predictor.predict_proba(test_data, model=model_name)
-    positive_class = predictor.class_labels[-1]
-    y_pred_proba = y_pred_proba_df[positive_class] if positive_class in y_pred_proba_df else y_pred_proba_df.iloc[:, -1]
-- Add `plt.close()` after each plot.
-- Save models in the correct `models` folder.
-- Use `time_limit=60` in `TabularPredictor.fit(...)` to keep debug cycles fast.
-- Keep the modular structure: load_data, train_model, generate_leaderboard, generate_evaluation_metrics, generate_feature_importance, plot_feature_importance, plot_roc_curve, plot_precision_recall_curve, plot_confusion_matrix, plot_shap_summary, main.
+                    fixed_code = self.clean_generated_code(fixed_code)
+                    print(f"[AutoDebug] Cleaned code:\n{fixed_code[:500]}")
 
-STRICT INSTRUCTIONS:
-- Return ONLY the corrected, clean, runnable Python code.
-- Do NOT include any markdown code fences or explanations.
-- Do NOT add comments in the code.
-- Ensure the code is ready to drop directly into `generated_pipeline.py` in the MCP pipeline workflow.
+                    if not fixed_code.strip():
+                        print("[AutoDebug] LLM returned empty code. Aborting debug.")
+                        return {"status": "error", "message": "LLM returned empty code. Aborting debug."}
 
-Below is the code that needs fixing:
+                    self.CODE_FILE.write_text(fixed_code, encoding="utf-8")
+                    print("[AutoDebug] Fixed code written to generated_pipeline.py")
 
---- CODE START ---
-{code_snippet}
---- CODE END ---
+                    retries += 1
+                    if time.time() - total_start_time > 600:  # 10-minute total timeout
+                        print("[AutoDebug] Total timeout reached.")
+                        return {"status": "error", "message": "Total debug timeout exceeded"}
 
---- ERROR START ---
-{error_snippet}
---- ERROR END ---
+                    await asyncio.sleep(1)  # Non-blocking delay
 
-Please ONLY return the corrected Python code, preserving its modular structure and functionality.
-"""
+            print("[AutoDebug] Maximum retries reached. Debugging did not succeed.")
+            return {"status": "error", "message": "Maximum retries reached. Please review the code manually.", "stderr": stderr}
 
-            fixed_code = generate_code(prompt)
-            clean_code = fixed_code.replace("```python", "").replace("```", "").strip()
-            with open(CODE_FILE, "w") as f:
-             f.write(clean_code)
+        except Exception as e:
+            print(f"[AutoDebug] Exception occurred: {e}")
+            return {"status": "error", "message": str(e)}
 
-
-            retries += 1
-            time.sleep(1)
-
-    else:
-        print("⚠️ Maximum retries reached. Please review the code manually.")
-
-if __name__ == "__main__":
-    auto_debug()
+    async def debug_pipeline(self):
+        return await self.auto_debug()

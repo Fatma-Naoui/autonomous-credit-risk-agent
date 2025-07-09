@@ -1,111 +1,101 @@
+import sys
 import pandas as pd
-import matplotlib.pyplot as plt
-import os
-import sklearn
+import numpy as np
 from autogluon.tabular import TabularPredictor
-import json
+from sklearn.metrics import roc_auc_score, precision_recall_curve, confusion_matrix, roc_curve
+import matplotlib.pyplot as plt
 
-def load_data(train_path, test_path):
+def load_data(train_path, test_path, label_column):
     train_data = pd.read_csv(train_path)
     test_data = pd.read_csv(test_path)
-    return train_data, test_data
+    return train_data, test_data, label_column
 
-def train_model(train_data, save_path):
-    predictor = TabularPredictor(label='loan_status', path=save_path).fit(train_data, time_limit=60)
+def train_model(train_data, label_column, time_limit):
+    predictor = TabularPredictor(label=label_column, path="agent_core/models").fit(train_data, time_limit=time_limit)
     return predictor
 
-def generate_leaderboard(predictor, save_path):
+def generate_leaderboard(predictor):
     leaderboard = predictor.leaderboard()
-    leaderboard.to_csv(os.path.join(save_path, 'model_leaderboard.csv'), index=False)
-    leaderboard.to_csv(os.path.join('../', 'leaderboard.csv'), index=False)
+    leaderboard.to_csv("agent_core/models/model_leaderboard.csv", index=False)
+    leaderboard.to_csv("agent_core/leaderboard.csv", index=False)
+    return leaderboard
 
-def generate_evaluation_metrics(predictor, test_data, save_path):
-    y_pred = predictor.predict(test_data)
-    y_pred_proba = predictor.predict_proba(test_data)
-    positive_class = predictor.class_labels[-1]
-    y_test = test_data['loan_status']
-    y_test_proba = y_pred_proba.iloc[:, -1]
-    metrics = {
-        'roc_auc': sklearn.metrics.roc_auc_score(y_test, y_test_proba)
+def generate_evaluation_metrics(predictor, test_data, label_column):
+    test_pred_proba = predictor.predict_proba(test_data)
+    test_labels = test_data[label_column]
+    evaluation_metrics = {
+        "roc_auc": roc_auc_score(test_labels, test_pred_proba.iloc[:, 1])
     }
-    with open(os.path.join(save_path, 'evaluation_metrics.json'), 'w') as f:
-        json.dump(metrics, f)
+    with open("agent_core/models/model_metrics.json", "w") as f:
+        import json
+        json.dump(evaluation_metrics, f)
+    return evaluation_metrics
 
-def generate_feature_importance(predictor, test_data, save_path):
+def generate_feature_importance(predictor, test_data):
     feature_importance = predictor.feature_importance(test_data)
-    feature_importance.to_csv(os.path.join(save_path, 'feature_importance.csv'), index=False)
     return feature_importance
 
-def plot_feature_importance(feature_importance, save_path):
-    feature_importance.plot(kind='bar')
-    plt.savefig(os.path.join(save_path, 'feature_importance.png'))
+def plot_feature_importance(feature_importance):
+    plt.bar(feature_importance.index, feature_importance.values)
+    plt.title("Feature Importance")
+    plt.xlabel("Features")
+    plt.ylabel("Importance")
+    plt.savefig("agent_core/models/feature_importance.png", dpi=300, bbox_inches="tight")
     plt.close()
 
-def plot_roc_curve(y_test, y_pred_proba, model_name, save_path, color):
-    fpr, tpr, _ = sklearn.metrics.roc_curve(y_test, y_pred_proba)
-    plt.plot(fpr, tpr, color=color, label=model_name)
-    plt.plot([0, 1], [0, 1], 'k--')
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('ROC Curve')
+def plot_roc_curve(test_labels, test_pred_proba, model_name):
+    fpr, tpr, _ = roc_curve(test_labels, test_pred_proba)
+    plt.plot(fpr, tpr, label=model_name)
+    plt.title("ROC Curve")
+    plt.xlabel("FPR")
+    plt.ylabel("TPR")
     plt.legend()
-    plt.savefig(os.path.join(save_path, f'{model_name}_roc_curve.png'))
+    plt.savefig(f"agent_core/models/roc_{model_name}.png", dpi=300, bbox_inches="tight")
     plt.close()
 
-def plot_precision_recall_curve(y_test, y_pred_proba, model_name, save_path, color):
-    precision, recall, _ = sklearn.metrics.precision_recall_curve(y_test, y_pred_proba)
-    plt.plot(recall, precision, color=color, label=model_name)
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    plt.title('Precision-Recall Curve')
+def plot_precision_recall_curve(test_labels, test_pred_proba, model_name):
+    precision, recall, _ = precision_recall_curve(test_labels, test_pred_proba)
+    plt.plot(recall, precision, label=model_name)
+    plt.title("Precision Recall Curve")
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
     plt.legend()
-    plt.savefig(os.path.join(save_path, f'{model_name}_precision_recall_curve.png'))
+    plt.savefig(f"agent_core/models/pr_{model_name}.png", dpi=300, bbox_inches="tight")
     plt.close()
 
-def plot_confusion_matrix(y_test, y_pred, model_name, save_path, color):
-    cm = sklearn.metrics.confusion_matrix(y_test, y_pred)
+def plot_confusion_matrix(test_labels, test_pred, model_name):
+    cm = confusion_matrix(test_labels, test_pred)
     plt.imshow(cm, interpolation='nearest', cmap='Blues')
-    plt.title('Confusion Matrix')
+    plt.title("Confusion Matrix")
     plt.colorbar()
-    plt.xlabel('Predicted Labels')
-    plt.ylabel('True Labels')
-    plt.savefig(os.path.join(save_path, f'{model_name}_confusion_matrix.png'))
-    plt.close()
-
-def plot_shap_summary(predictor, test_data, save_path):
-    shap_values = predictor.shap_values(test_data)
-    shap.summary_plot(shap_values, test_data, plot_type='bar')
-    plt.savefig(os.path.join(save_path, 'shap_summary.png'))
+    plt.xlabel("Predicted Labels")
+    plt.ylabel("True Labels")
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            plt.text(j, i, cm[i, j], ha="center", va="center", color="black")
+    plt.savefig(f"agent_core/models/cm_{model_name}.png", dpi=300, bbox_inches="tight")
     plt.close()
 
 def main():
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    data_path = os.path.join(project_root, 'data')
-    train_path = os.path.join(data_path, 'train_data.csv')
-    test_path = os.path.join(data_path, 'test_data.csv')
-    model_path = os.path.join(project_root, 'models')
-    os.makedirs(model_path, exist_ok=True)
+    if len(sys.argv) != 4:
+        print("Usage: python generated_pipeline.py <train_path> <test_path> <label_column>")
+        return
+    train_path, test_path, label_column = sys.argv[1], sys.argv[2], sys.argv[3]
+    train_data, test_data, label_column = load_data(train_path, test_path, label_column)
+    predictor = train_model(train_data, label_column, time_limit=60)
+    leaderboard = generate_leaderboard(predictor)
+    leaderboard_sorted = leaderboard.sort_values(by="score_val", ascending=False)
+    model_names = leaderboard_sorted["model"].head(3).tolist()
+    evaluation_metrics = generate_evaluation_metrics(predictor, test_data, label_column)
+    feature_importance = generate_feature_importance(predictor, test_data)
+    plot_feature_importance(feature_importance)
+    colors = ["red", "green", "blue"]
+    for i, model_name in enumerate(model_names):
+        test_pred = predictor.predict(test_data, model=model_name)
+        test_pred_proba = predictor.predict_proba(test_data, model=model_name)
+        plot_roc_curve(test_data[label_column], test_pred_proba.iloc[:, 1], model_name)
+        plot_precision_recall_curve(test_data[label_column], test_pred_proba.iloc[:, 1], model_name)
+        plot_confusion_matrix(test_data[label_column], test_pred, model_name)
 
-    train_data, test_data = load_data(train_path, test_path)
-    predictor = train_model(train_data, model_path)
-    generate_leaderboard(predictor, model_path)
-    generate_evaluation_metrics(predictor, test_data, model_path)
-    feature_importance = generate_feature_importance(predictor, test_data, model_path)
-    plot_feature_importance(feature_importance, model_path)
-
-    leaderboard = predictor.leaderboard()
-    top_models = leaderboard['model'].iloc[:3]
-    colors = ['red', 'green', 'blue']
-
-    for i, model_name in enumerate(top_models):
-        y_pred = predictor.predict(test_data, model=model_name)
-        y_pred_proba_df = predictor.predict_proba(test_data, model=model_name)
-        positive_class = predictor.class_labels[-1]
-        y_pred_proba = y_pred_proba_df[positive_class] if positive_class in y_pred_proba_df else y_pred_proba_df.iloc[:, -1]
-
-        plot_roc_curve(test_data['loan_status'], y_pred_proba, model_name, model_path, colors[i])
-        plot_precision_recall_curve(test_data['loan_status'], y_pred_proba, model_name, model_path, colors[i])
-        plot_confusion_matrix(test_data['loan_status'], y_pred, model_name, model_path, colors[i])
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

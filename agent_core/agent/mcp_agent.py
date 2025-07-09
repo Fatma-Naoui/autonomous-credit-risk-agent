@@ -6,7 +6,7 @@ import sys
 
 def load_mcp_schema(schema_path=None):
     if schema_path is None:
-        root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        root_dir = os.path.dirname(os.path.abspath(__file__))
         schema_path = os.path.join(root_dir, "mcp_schema.yaml")
     if not os.path.isfile(schema_path):
         raise FileNotFoundError(f"❌ mcp_schema.yaml not found at: {schema_path}")
@@ -21,14 +21,12 @@ def is_task_active(schema, task_name):
 
 def run_task(script_name, description):
     print(f"\n🚀 {description} [{script_name}]\n")
-
     script_path = os.path.join(os.path.dirname(__file__), script_name)
 
     if not os.path.isfile(script_path):
         print(f"❌ {script_name} not found at {script_path}. Stopping MCP pipeline.\n")
         sys.exit(1)
 
-    # Use sys.executable to ensure it runs inside the current venv
     result = subprocess.run([sys.executable, script_path])
 
     if result.returncode != 0:
@@ -48,7 +46,10 @@ def run_mcp_pipeline():
         run_task("debugger_agent.py", "Debugging generated pipeline code")
 
     if is_task_active(schema, "pipeline_run"):
-        run_task("generated_pipeline.py", "Running generated AutoGluon pipeline")
+        print("\n⚡ To run the pipeline on user data, use:\n")
+        print("   python generated_pipeline.py <train_dataset> <test_dataset> <label_column>\n")
+        print("⚡ Example:\n")
+        print("   python generated_pipeline.py uploads/user_train.csv uploads/user_test.csv loan_status\n")
 
     if is_task_active(schema, "dashboard"):
         run_task("app.py", "Launching Streamlit dashboard for visualization")

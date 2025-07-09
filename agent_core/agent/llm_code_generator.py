@@ -1,73 +1,47 @@
-import re
 import os
+import sys
+import json
+import subprocess
+import time
+from pathlib import Path
 from llm_client import generate_code
+from agent_core.prompts.prompts import autogluon_pipeline_generator_prompt
 
-prompt = """
+class CodeGeneratorAgent:
+    def clean_generated_code(self, code):
+        code = code.strip()
+        if code.startswith("```"):
+            code = code.split("```", 1)[-1].strip()
+            if code.lower().startswith("python"):
+                code = code[len("python"):].lstrip('\n').lstrip()
+        if code.endswith("```"):
+            code = code.rsplit("```", 1)[0].strip()
+        return code
 
-You are a senior data scientist. Generate clean, runnable Python code for a binary classification credit risk project using AutoGluon.
+    async def generate(self, arguments):
+        try:
+            prompt = autogluon_pipeline_generator_prompt.format(
+                label_column=arguments["label_column"]
+            )
 
-Requirements:
+            code = generate_code(prompt)
+            code = self.clean_generated_code(code)
 
-- Use `from autogluon.tabular import TabularPredictor`.
-- **Create a function:**
-  ```
-  def run_pipeline(train_path, test_path, output_path):
-  ```
-  which:
-  - Loads training data from `train_path` and test data from `test_path` using `pd.read_csv()`.
-  - Uses `output_path` for saving all models, leaderboards, metrics, and plots.
-- Train the model using only default AutoGluon hyperparameters. Do not include any `hyperparameters` argument in the code.
-- Save the trained model in `output_path/AutogluonModels`.
-- Generate:
-  - A leaderboard CSV as `output_path/model_leaderboard.csv` and a copy as `output_path/leaderboard.csv`.
-  - An evaluation metrics JSON as `output_path/model_metrics.json` and a copy as `output_path/evaluation_metrics.json`.
-  - A feature importance plot as `output_path/shap_summary.png`.
-- Use pandas for CSV operations and matplotlib for all plots.
-- Do not use or import the `shap` library.
-- Do not include any explanations or comments, only runnable Python code.
-- Ensure `output_path` exists before saving outputs.
-- Import scikit-learn as `import sklearn` (not `scikit-learn`).
-- After training, extract the top 3 models from the leaderboard.
-- For each of the top 3 models:
-  - Generate and save:
-    - ROC curve as `output_path/roc_{model_name}.png`
-    - Precision-Recall curve as `output_path/pr_{model_name}.png`
-    - Confusion Matrix as `output_path/confusion_matrix_{model_name}.png`
-  - Use `sklearn.metrics` for ROC, AUC, Precision-Recall, and Confusion Matrix calculations.
-  - Use consistent colors for each model across all plots so that if model A uses red in the ROC curve, it also uses red in the PR and Confusion Matrix plots.
-  - Save all plots with `dpi=300` and `bbox_inches="tight"`.
-- Remove any incorrect calls to `predictor.evaluate(test_data, 'roc_auc')`.
-- Compute ROC AUC using `sklearn.metrics.roc_auc_score`.
-- Use structured, reusable functions:
-  - `load_data`
-  - `train_model`
-  - `generate_leaderboard`
-  - `generate_evaluation_metrics`
-  - `generate_feature_importance` (pass `test_data` to `predictor.feature_importance`)
-  - `plot_feature_importance`
-  - `plot_roc_curve`
-  - `plot_precision_recall_curve`
-  - `plot_confusion_matrix`
-  - `run_pipeline`
-- Use the correct Pandas indexing (`iloc` or column name) to extract positive class probabilities for `roc_auc_score`.
-- Ensure it works even if labels are categorical by dynamically selecting the positive class column.
-- Return only the raw, clean, runnable Python code without markdown fences under any circumstance.
+            current_dir = Path(__file__).resolve().parent
+            out_path = current_dir / "generated_pipeline.py"
 
-Your output will be used directly in a production MCP autonomous pipeline for credit risk modeling, so it must be robust, modular, and aligned strictly with these requirements.
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(code)
 
-"""
+            return {
+             "status": "success",
+             "message": f"Pipeline generated and saved to {out_path}",
+             "generated_code": code 
+             }
 
-code = generate_code(prompt)
+        except Exception as e:
+           return {
+           "status": "error",
+           "message": str(e) 
+           }
 
-# Strip markdown code fences if present (``` or ```python)
-code = re.sub(r"^```(?:python)?\n", "", code, flags=re.MULTILINE)  # Remove opening fence
-code = re.sub(r"\n```$", "", code, flags=re.MULTILINE)             # Remove closing fence
-
-# Get current script folder (llm_code_generator.py folder)
-current_dir = os.path.dirname(os.path.abspath(__file__))
-out_path = os.path.join(current_dir, "generated_pipeline.py")
-
-with open(out_path, "w", encoding="utf-8") as f:
-    f.write(code)
-
-print(f"Generated pipeline saved to: {out_path}")
