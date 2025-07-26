@@ -9,7 +9,10 @@ __pycache__/
 .vscode/
 
 # Ignore models (large files, can be regenerated)
-agent_core/models/
+agent_core/agent/models/
+*.pkl
+*.ubj
+
 
 # Ignore environment files
 .env
@@ -17,3 +20,5 @@ agent_core/models/
 # Ignore system files
 .DS_Store
 Thumbs.db
+# Ignore all JSON files
+*.json

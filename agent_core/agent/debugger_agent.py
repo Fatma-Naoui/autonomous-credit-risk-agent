@@ -5,6 +5,7 @@ import time
 import json
 from pathlib import Path
 from llm_client import generate_code
+from typing import Dict, Any
 from agent_core.prompts.prompts import autogluon_pipeline_debugger_prompt
 
 class DebuggerAgent:
@@ -74,7 +75,8 @@ class DebuggerAgent:
                     )
                     print(f"[AutoDebug] Prompt to LLM:\n{prompt[:500]}")
 
-                    fixed_code = await generate_code(prompt)  # Assume generate_code is async
+                    fixed_code = generate_code(prompt)
+
                     print(f"[AutoDebug] Raw LLM response:\n{fixed_code[:500]}")
 
                     fixed_code = self.clean_generated_code(fixed_code)
@@ -101,5 +103,5 @@ class DebuggerAgent:
             print(f"[AutoDebug] Exception occurred: {e}")
             return {"status": "error", "message": str(e)}
 
-    async def debug_pipeline(self):
+    async def debug_pipeline(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         return await self.auto_debug()

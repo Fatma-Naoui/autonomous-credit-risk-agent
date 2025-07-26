@@ -20,9 +20,8 @@ class CodeGeneratorAgent:
 
     async def generate(self, arguments):
         try:
-            prompt = autogluon_pipeline_generator_prompt.format(
-                label_column=arguments["label_column"]
-            )
+            # Generate code WITHOUT passing label_column
+            prompt = autogluon_pipeline_generator_prompt.format()
 
             code = generate_code(prompt)
             code = self.clean_generated_code(code)
@@ -34,14 +33,13 @@ class CodeGeneratorAgent:
                 f.write(code)
 
             return {
-             "status": "success",
-             "message": f"Pipeline generated and saved to {out_path}",
-             "generated_code": code 
-             }
+                "status": "success",
+                "message": f"Pipeline generated and saved to {out_path}",
+                "generated_code": code
+            }
 
         except Exception as e:
-           return {
-           "status": "error",
-           "message": str(e) 
-           }
-
+            return {
+                "status": "error",
+                "message": str(e)
+            }
