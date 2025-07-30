@@ -18,9 +18,10 @@ Requirements:
 - Use os.makedirs(output_dir, exist_ok=True) to ensure the directory exists
 - **Save models in the output_dir (e.g., TabularPredictor(label=label_column, path=output_dir))** instead of "."
 - Save all files using os.path.join(output_dir, ...) instead of hardcoded paths
+-Save model_metrics.json for all models ( f1 precision auc gini etc )
 - Save:
     model_leaderboard.csv
-    model_metrics.json
+   
     evaluation_metrics.json
     shap_summary.png
     roc_{{model_name}}.png
@@ -34,6 +35,7 @@ Requirements:
     plot_precision_recall_curve, plot_confusion_matrix, main
 - Replace test_pred_proba[:, 1] with test_pred_proba.iloc[:, 1] for roc_auc_score
 - Use predictor.model_names()[0] (not predictor.model_names[0])
+-Save model_metrics.json for all models ( f1 precision auc gini etc )
 - For the **best 3 models based on leaderboard score_val descending**, replace:
     model_names = predictor.model_names()[:3]
   with:

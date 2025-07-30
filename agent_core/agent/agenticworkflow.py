@@ -75,7 +75,7 @@ class AutonomousPipelineWorkflow:
 
     async def run_pipeline(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         if "artifacts_path" not in arguments:
-            arguments["artifacts_path"] = str(ARTIFACTS_DIR)  # Default parent directory
+            arguments["artifacts_path"] = str(ARTIFACTS_DIR)
 
         initial_state: PipelineState = {
             "arguments": arguments,
@@ -95,9 +95,6 @@ class AutonomousPipelineWorkflow:
         final_state = await self.workflow.ainvoke(initial_state)
         return final_state.get("final_result", {})
 
-    # ---------------------------
-    # PLAN NODE
-    # ---------------------------
     async def _plan_node(self, state: PipelineState) -> PipelineState:
         logger.info("Orchestrator planning execution strategy...")
         try:
@@ -109,14 +106,13 @@ class AutonomousPipelineWorkflow:
             })
             state["execution_strategy"] = execution_strategy
             state["orchestrator_decision"] = execution_strategy
-            message = AgentMessage(
-                from_agent=AgentRole.ORCHESTRATOR,
-                to_agent=AgentRole.CODE_GENERATOR,
-                message_type="execution_plan",
-                content=execution_strategy,
-                timestamp=datetime.now()
-            )
-            state["agent_messages"].append(message.__dict__)
+            state["agent_messages"].append({
+                "from_agent": AgentRole.ORCHESTRATOR.value,
+                "to_agent": AgentRole.CODE_GENERATOR.value,
+                "message_type": "execution_plan",
+                "content": execution_strategy,
+                "timestamp": datetime.now().isoformat()
+            })
             logger.info(f"Orchestrator decided: {execution_strategy.get('decision', 'unknown')}")
         except Exception as e:
             logger.error(f"Orchestrator planning failed: {e}")
@@ -127,9 +123,6 @@ class AutonomousPipelineWorkflow:
             }
         return state
 
-    # ---------------------------
-    # GENERATION NODE
-    # ---------------------------
     async def _generate_node(self, state: PipelineState) -> PipelineState:
         try:
             strategy = state["execution_strategy"]
@@ -144,23 +137,19 @@ class AutonomousPipelineWorkflow:
                 self._mark_code_generation()
                 self._update_agent_memory("code_generation", "success")
             state["generation_status"] = "success"
-            message = AgentMessage(
-                from_agent=AgentRole.CODE_GENERATOR,
-                to_agent=AgentRole.DEBUGGER,
-                message_type="generation_complete",
-                content={"status": "success", "strategy": state["execution_strategy"]},
-                timestamp=datetime.now()
-            )
-            state["agent_messages"].append(message.__dict__)
+            state["agent_messages"].append({
+                "from_agent": AgentRole.CODE_GENERATOR.value,
+                "to_agent": AgentRole.DEBUGGER.value,
+                "message_type": "generation_complete",
+                "content": {"status": "success", "strategy": state["execution_strategy"]},
+                "timestamp": datetime.now().isoformat()
+            })
         except Exception as e:
             self._update_agent_memory("code_generation", f"error: {e}")
             state["generation_status"] = "error"
             state["error_message"] = str(e)
         return state
 
-    # ---------------------------
-    # DEBUG NODE
-    # ---------------------------
     async def _debug_node(self, state: PipelineState) -> PipelineState:
         try:
             strategy = state["execution_strategy"]
@@ -185,23 +174,19 @@ class AutonomousPipelineWorkflow:
                     self._update_agent_memory("debugging", "success")
             else:
                 state["debug_status"] = "success"
-            message = AgentMessage(
-                from_agent=AgentRole.DEBUGGER,
-                to_agent=AgentRole.EXECUTOR,
-                message_type="debug_complete",
-                content={"status": state["debug_status"], "error": state.get("error_message", "")},
-                timestamp=datetime.now()
-            )
-            state["agent_messages"].append(message.__dict__)
+            state["agent_messages"].append({
+                "from_agent": AgentRole.DEBUGGER.value,
+                "to_agent": AgentRole.EXECUTOR.value,
+                "message_type": "debug_complete",
+                "content": {"status": state["debug_status"], "error": state.get("error_message", "")},
+                "timestamp": datetime.now().isoformat()
+            })
         except Exception as e:
             state["debug_status"] = "error"
             state["error_message"] = str(e)
             self._update_agent_memory("debugging", f"error: {e}")
         return state
 
-    # ---------------------------
-    # EXECUTION NODE (Dataset Hash Restored)
-    # ---------------------------
     async def _execute_node(self, state: PipelineState) -> PipelineState:
         logger.info("Executor agent taking control...")
         try:
@@ -212,7 +197,6 @@ class AutonomousPipelineWorkflow:
                 state["error_message"] = f"Missing required arguments: {required}"
                 return state
 
-            # Compute dataset hash
             dataset_hash = self._get_dataset_hash(args["train_path"], args["test_path"], args["label_column"])
             parent_artifacts_dir = Path(args.get("artifacts_path", ARTIFACTS_DIR))
             dataset_artifacts = parent_artifacts_dir / dataset_hash
@@ -230,7 +214,6 @@ class AutonomousPipelineWorkflow:
             state["execution_plan"] = execution_plan
             logger.info(f"Executor decided: {execution_plan.get('decision', 'unknown')}")
 
-            # Cache check
             cache = self._load_json(CACHE_FILE)
             if dataset_hash in cache and execution_plan.get("decision") != "recovery_mode_execution":
                 logger.info("Executor using cached artifacts.")
@@ -240,7 +223,6 @@ class AutonomousPipelineWorkflow:
                 state["execution_status"] = "success"
                 return state
 
-            # Run pipeline
             cmd = [
                 sys.executable,
                 str(PIPELINE_FILE.resolve()),
@@ -279,9 +261,6 @@ class AutonomousPipelineWorkflow:
             state["error_message"] = str(e)
         return state
 
-    # ---------------------------
-    # FINALIZE NODE
-    # ---------------------------
     async def _finalize_node(self, state: PipelineState) -> PipelineState:
         logger.info("Finalizing pipeline with agent summary...")
         state["pipeline_ready"] = all(
@@ -300,9 +279,6 @@ class AutonomousPipelineWorkflow:
         logger.info(f"Pipeline completed with {len(state.get('agent_messages', []))} agent interactions")
         return state
 
-    # ---------------------------
-    # HELPER METHODS
-    # ---------------------------
     def _assess_risk_flags(self, state: PipelineState) -> list:
         risk_flags = []
         if state.get("debug_status") == "error":

@@ -98,3 +98,11 @@ class ExecutorAgent:
             }
             self._save_decision(context, fallback)
             return fallback
+    def assess_execution_path(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        options = [
+            "standard_execution",
+            "parallel_with_checkpoints",
+            "aggressive_fast_track",
+            "recovery_mode_execution"
+        ]
+        return self.make_decision(context, options)
