@@ -4,7 +4,7 @@ import json
 import subprocess
 import time
 from pathlib import Path
-from llm_client import generate_code
+from agent_core.agent.llm_client import generate_code
 from agent_core.prompts.prompts import autogluon_pipeline_generator_prompt
 
 class CodeGeneratorAgent:

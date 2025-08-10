@@ -1,53 +1,76 @@
 from langchain.prompts import PromptTemplate
 
-loan_model_report_prompt = PromptTemplate(
+credit_risk_report_prompt = PromptTemplate(
     input_variables=[
         "model_type",
-        "leaderboard_summary",
-        "top_model_metrics",
-        "autogluon_info",
-        "credit_metrics_info",
-        "metric_details"
+        "leaderboard_table",
+        "top_model_insights",
+        "autogluon_summary",
+        "leaderboard_explanation",
+        "final_conclusion"
     ],
     template="""
-You are a senior AI engineer specialized in credit risk modeling.
+You are a senior AI engineer with deep knowledge in:
+- Credit risk modeling and financial regulations
+- Automated machine learning systems (AutoML)
+- Communicating results to credit officers and model validation teams
 
-Generate a detailed technical report explaining the results of a credit risk pipeline using {model_type}.
+Generate a **structured, high-impact credit risk modeling report** targeting:
+- Credit risk officers
+- Regulatory compliance teams
+- Financial analysts
 
-The report must include:
+### 1. Why Credit Risk Modeling Needs Machine Learning
+Explain:
+- Why traditional credit scoring is insufficient
+- How ML models outperform manual scoring (non-linear patterns, automation, regulatory alignment)
+- How ML improves precision, fairness, and reduces risk
 
-1. **Modeling Overview**  
-Summarize the modeling workflow using AutoGluon, including training, evaluation, and model selection steps, based on this:  
-{autogluon_info}
+### 2. Model Training with AutoGluon
+Describe:
+- How AutoGluon trains and stacks models
+- Validation splitting, ensembling, and metric optimization
+- Summarize AutoGluon's automation logic
 
-2. **Leaderboard Interpretation**  
-- Explain how the leaderboard was constructed.  
-- Identify the primary metric used for ranking.  
-- Describe how models compare in terms of validation score and robustness.  
-- Provide a ranked summary of the top 3 models:  
-{leaderboard_summary}
+**Context:**
+{autogluon_summary}
 
-3. **Top 3 Model Metrics**  
-- For each of the top 3 models, analyze core evaluation metrics: AUC, Gini, F1, Precision, Recall, Accuracy, etc.  
-- Provide a rationale for performance differences.  
-- Use this data:  
-{top_model_metrics}
+---
 
-4. **Metric Significance in Credit Risk**  
-- For each metric used, explain its **financial interpretation**:  
-    - What does a high/low score mean in loan eligibility?  
-    - Why is it important for risk assessment?  
-- Use this reference:  
-{credit_metrics_info}
+### 3. Leaderboard: All Trained Models
+Show a ranked table of all models with score, inference time, training time.
 
-5. **Insights from External Research**  
-- Summarize web or document-based insights about metrics, thresholds, and best practices.  
-- Enrich the analysis using these sources:  
-{metric_details}
+**Model Leaderboard:**
+{leaderboard_table}
 
-**Instructions:**  
-- Focus on technical clarity, depth, and financial relevance.  
-- Use clear headings and bullet points where helpful.  
-- Do NOT include raw code, log traces, or file names.
+**Leaderboard Analysis:** just explain them without any bluff without saying good morning **give immediate explanation*
+{leaderboard_explanation}
+
+---
+
+### 4. Benchmarking Top 3 Models
+For each top model:
+- Show accuracy, F1, Gini, AUC, precision
+- Comment on confusion matrix and false positive/negative tradeoff
+- Indicate when a model is better suited to low-risk lending
+
+**Benchmark Insights:**
+{top_model_insights}
+
+---
+
+### 5. Final Conclusion
+Wrap up the report by answering:
+- Why ML-based modeling outperforms traditional scoring
+- How this pipeline improves decisioning, monitoring, and fairness
+- Business impact and value delivered by the AutoGluon approach
+
+**Summary:**
+{final_conclusion}
+
+---
+
+Keep language formal but clear. Focus on financial value, model quality, and automation impact.
+Avoid technical clutter like raw Python logs, file paths, or low-level metrics.
 """
 )

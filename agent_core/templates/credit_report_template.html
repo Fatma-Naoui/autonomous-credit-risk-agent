@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Credit Risk Modeling Report</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #2d3748;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 2em auto;
+      padding: 0;
+      background-color: #ffffff;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .header-section {
+      background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+      color: white;
+      text-align: center;
+      padding: 3em 2em;
+      position: relative;
+      overflow: hidden;
+    }
+    .header-section::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="20" cy="20" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="80" cy="80" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="40" cy="60" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+      opacity: 0.3;
+    }
+    .header-section h1 {
+      font-size: 3.2em;
+      margin: 0 0 0.5em 0;
+      font-weight: 700;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      position: relative;
+      z-index: 1;
+    }
+    .header-section .subtitle {
+      font-size: 1.3em;
+      opacity: 0.9;
+      font-weight: 300;
+      position: relative;
+      z-index: 1;
+    }
+    .content-wrapper { padding: 2em 3em 3em; }
+    .section { margin-bottom: 4em; position: relative; }
+    .section h2 {
+      color: #1e40af; font-size: 2.2em; margin-bottom: 1em;
+      padding-bottom: 0.5em; border-bottom: 3px solid #e5e7eb; position: relative; font-weight: 600;
+    }
+    .section h2::before {
+      content: attr(data-section);
+      position: absolute; left: -2.5em; top: 0;
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      color: white; width: 2em; height: 2em; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.6em; font-weight: bold; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    .content-block {
+      background: linear-gradient(145deg, #f8fafc, #f1f5f9);
+      border-radius: 12px; padding: 2em; margin-bottom: 1.5em;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;
+    }
+    .ml-benefits { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-left: 6px solid #10b981; }
+    .workflow-info { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 6px solid #f59e0b; }
+
+    /* Leaderboard: container + full HTML table from Pandas */
+    .leaderboard-table { background: #f8fafc; border-radius: 8px; padding: 1.5em; margin: 1em 0; overflow-x: auto; border: 1px solid #e2e8f0; }
+    .autogluon-lb { width: 100%; border-collapse: collapse; font-size: 0.92em; }
+    .autogluon-lb th, .autogluon-lb td {
+      padding: 0.6em 0.8em; border-bottom: 1px solid #e5e7eb; text-align: left; white-space: nowrap;
+    }
+    .autogluon-lb th { background: #1e40af; color: #fff; position: sticky; top: 0; }
+    .autogluon-lb tr:hover { background: #f1f5f9; }
+
+    .model-card {
+      background: linear-gradient(145deg, #ffffff, #f8fafc);
+      border-radius: 16px; padding: 2em; margin-bottom: 2em;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .model-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15); }
+    .model-card h3 { color: #1e40af; font-size: 1.5em; margin-bottom: 1em; display: flex; align-items: center; gap: 0.5em; }
+    .model-badge {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white;
+      padding: 0.3em 0.8em; border-radius: 20px; font-size: 0.7em; font-weight: 600;
+    }
+
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1em; margin: 1em 0; }
+    .metric-item { background: #f8fafc; padding: 1em; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0; }
+    .metric-value { font-size: 1.5em; font-weight: bold; color: #1e40af; }
+
+    .leaderboard-explanation {
+      background: linear-gradient(135deg, #fef7ff 0%, #f3e8ff 100%);
+      border-left: 6px solid #8b5cf6; border-radius: 12px; padding: 2em; margin-bottom: 1.5em; line-height: 1.8;
+    }
+    .leaderboard-explanation h3 { color: #7c3aed; font-size: 1.4em; margin-bottom: 1em; display: flex; align-items: center; gap: 0.5em; }
+
+    .conclusion-section {
+      background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+      border-radius: 16px; padding: 3em; margin-top: 3em; text-align: center; border: 2px solid #10b981;
+    }
+    .conclusion-section h2 { color: #059669; font-size: 2.5em; margin-bottom: 1em; }
+    .key-takeaway { background: rgba(255, 255, 255, 0.8); padding: 1.5em; border-radius: 8px; margin: 1em 0; border-left: 4px solid #10b981; }
+
+    .footer-section { background: #1f2937; color: #d1d5db; text-align: center; padding: 2em; font-size: 0.9em; }
+
+    @media (max-width: 768px) {
+      .container { margin: 1em; border-radius: 8px; }
+      .content-wrapper { padding: 1.5em; }
+      .section h2::before { display: none; }
+      .header-section h1 { font-size: 2.5em; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header-section">
+      <h1>🏦 Credit Risk Modeling Report</h1>
+      <p class="subtitle">Advanced Machine Learning Analysis with {{ model_type }}</p>
+    </div>
+
+    <div class="content-wrapper">
+      <!-- Section 1: ML Fundamentals -->
+      <div class="section">
+        <h2 data-section="1">Why Credit Risk Modeling Needs Machine Learning</h2>
+        <div class="content-block ml-benefits">
+          <h3>🎯 The ML Advantage</h3>
+          <p>{{ ml_fundamentals }}</p>
+        </div>
+      </div>
+
+      <!-- Section 2: AutoGluon Workflow -->
+      <div class="section">
+        <h2 data-section="2">Model Training with {{ model_type }}</h2>
+        <div class="content-block workflow-info">
+          <h3>⚙️ Training Workflow</h3>
+          <p>{{ autogluon_summary }}</p>
+        </div>
+      </div>
+
+      <!-- Section 3: Leaderboard -->
+      <div class="section">
+        <h2 data-section="3">Model Leaderboard (Validation Performance)</h2>
+
+        {% if leaderboard_table %}
+        <div class="leaderboard-table">
+          {{ leaderboard_table | safe }}
+        </div>
+        {% endif %}
+
+        {% if leaderboard_models %}
+        <div class="content-block" style="background:linear-gradient(135deg,#e0f2fe 0%, #bfdbfe 100%); border-left:6px solid #3b82f6;">
+          <h3>🏆 Top Performing Models (AutoGluon Ranking)</h3>
+          <div class="metrics-grid">
+            {% for model in leaderboard_models %}
+            <div class="metric-item">
+              <div class="model-badge">{{ loop.index }}</div>
+              <div style="margin-top:0.5em;font-weight:600;">{{ model }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if leaderboard_explanation %}
+        <div class="leaderboard-explanation">
+          <h3>📊 Understanding the AutoGluon Leaderboard</h3>
+          <p>{{ leaderboard_explanation }}</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Section 4: Benchmarking Top Models -->
+      <div class="section">
+        <h2 data-section="4">Top Model Performance Analysis (Test Set)</h2>
+        {% for m in model_metrics %}
+        <div class="model-card">
+          <h3>{{ m.name }} <span class="model-badge">Rank #{{ loop.index }}</span></h3>
+          <div class="metrics-grid">
+            {% for pair in m.metrics.split(' | ') %}
+              {% set kv = pair.split(': ') %}
+              <div class="metric-item">
+                <div style="font-size:0.9em;color:#6b7280;">{{ kv[0] }}</div>
+                <div class="metric-value">{{ kv[1] }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Section 5: Final Conclusion -->
+      <div class="conclusion-section">
+        <h2>Final Conclusions & Business Impact</h2>
+        <div class="key-takeaway">
+          <p>{{ final_conclusion }}</p>
+        </div>
+        <div class="metrics-grid" style="margin-top:1em;">
+          <div class="metric-item">
+            <div class="metric-value">80%+</div>
+            <div>Time Reduction</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-value">{{ model_metrics|length }}</div>
+            <div>Models Evaluated</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-value">{{ leaderboard_models[0] if leaderboard_models }}</div>
+            <div>Best Performer</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-section">
+      <p>© 2025 EY Risk AI Unit — Confidential Machine Learning Report</p>
+      <p>Generated: {{ generated_at }}</p>
+    </div>
+  </div>
+</body>
+</html>

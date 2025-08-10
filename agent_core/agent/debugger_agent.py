@@ -4,7 +4,7 @@ import sys
 import time
 import json
 from pathlib import Path
-from llm_client import generate_code
+from agent_core.agent.llm_client import generate_code
 from typing import Dict, Any
 from agent_core.prompts.prompts import autogluon_pipeline_debugger_prompt
 
