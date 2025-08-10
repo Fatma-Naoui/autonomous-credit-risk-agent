@@ -22,3 +22,7 @@ agent_core/agent/models/
 Thumbs.db
 # Ignore all JSON files
 *.json
+# Ignore generated artifacts and model directories
+artifacts/
+e5-large/
+python-embed/
